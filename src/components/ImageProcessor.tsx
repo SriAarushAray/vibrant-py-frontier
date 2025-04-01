@@ -1,4 +1,3 @@
-
 import { useState, useRef, ChangeEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -6,15 +5,17 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Upload, Image as ImageIcon, Sliders, Trash2, Zap, FileImage, Layers, RefreshCw, Loader } from 'lucide-react';
+import { Upload, Image as ImageIcon, Sliders, Trash2, Zap, FileImage, Layers, RefreshCw, Loader, Crop, Save } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { removeBackground, loadImage } from '@/utils/backgroundRemoval';
+import CropModal from './CropModal';
 
 const ImageProcessor = () => {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [displayedImage, setDisplayedImage] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const { toast } = useToast();
   
   // Filter states
@@ -128,8 +129,6 @@ const ImageProcessor = () => {
       [type]: value
     }));
     
-    // This is a simplified version - real implementation would use web filters or WebGL
-    // for more complex image processing like in your Python code
     const img = new Image();
     img.onload = () => {
       const canvas = canvasRef.current;
@@ -172,19 +171,15 @@ const ImageProcessor = () => {
         description: "Removing background... This may take a moment."
       });
       
-      // Create a new image element from the original image URL
       const img = new Image();
       img.src = originalImage;
       
-      // Wait for image to load then process
       await new Promise((resolve) => {
         img.onload = resolve;
       });
       
-      // Use the ML-based background removal utility
       const resultImageUrl = await removeBackground(img);
       
-      // Update the displayed image
       setDisplayedImage(resultImageUrl);
       
       toast({
@@ -201,6 +196,49 @@ const ImageProcessor = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleOpenCropModal = () => {
+    if (!originalImage) {
+      toast({
+        title: "No Image",
+        description: "Please upload an image first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsCropModalOpen(true);
+  };
+
+  const handleSaveCroppedImage = (croppedImageUrl: string) => {
+    setDisplayedImage(croppedImageUrl);
+    toast({
+      title: "Image Cropped",
+      description: "Your image has been cropped successfully."
+    });
+  };
+
+  const handleSaveImage = () => {
+    if (!displayedImage) {
+      toast({
+        title: "No Image",
+        description: "There's no image to save.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = displayedImage;
+    link.download = "processed-image.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Image Saved",
+      description: "Your image has been saved successfully."
+    });
   };
 
   return (
@@ -241,6 +279,17 @@ const ImageProcessor = () => {
               <div className="hidden">
                 <canvas ref={canvasRef}></canvas>
               </div>
+
+              {displayedImage && (
+                <Button 
+                  onClick={handleSaveImage}
+                  variant="outline"
+                  className="mt-4 flex items-center gap-2"
+                >
+                  <Save size={18} />
+                  Save Image
+                </Button>
+              )}
             </div>
             
             <div className="flex-1 flex flex-col gap-6">
@@ -271,13 +320,13 @@ const ImageProcessor = () => {
                     </Button>
                     
                     <Button 
-                      onClick={handleRemoveBackground}
+                      onClick={handleOpenCropModal}
                       variant="outline"
                       className="flex items-center gap-2"
                       disabled={!originalImage || isProcessing}
                     >
-                      <Trash2 size={18} />
-                      Remove Background
+                      <Crop size={18} />
+                      Crop Image
                     </Button>
                     
                     <Button 
@@ -455,6 +504,13 @@ const ImageProcessor = () => {
           </div>
         </CardContent>
       </Card>
+
+      <CropModal 
+        isOpen={isCropModalOpen} 
+        onClose={() => setIsCropModalOpen(false)}
+        imageUrl={originalImage}
+        onSave={handleSaveCroppedImage}
+      />
     </div>
   );
 };
