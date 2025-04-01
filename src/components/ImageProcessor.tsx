@@ -6,13 +6,15 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Upload, Image as ImageIcon, Sliders, Trash2, Zap, FileImage, Layers, RefreshCw } from 'lucide-react';
+import { Upload, Image as ImageIcon, Sliders, Trash2, Zap, FileImage, Layers, RefreshCw, Loader } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { removeBackground, loadImage } from '@/utils/backgroundRemoval';
 
 const ImageProcessor = () => {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [displayedImage, setDisplayedImage] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   
   // Filter states
@@ -152,7 +154,7 @@ const ImageProcessor = () => {
     img.src = originalImage;
   };
   
-  const removeBackground = () => {
+  const handleRemoveBackground = async () => {
     if (!originalImage) {
       toast({
         title: "No Image",
@@ -162,13 +164,43 @@ const ImageProcessor = () => {
       return;
     }
     
-    toast({
-      title: "Processing",
-      description: "Background removal would require API integration for best results."
-    });
+    setIsProcessing(true);
     
-    // Note: Real background removal requires ML models or specialized APIs
-    // This is just a placeholder for the UI demonstration
+    try {
+      toast({
+        title: "Processing",
+        description: "Removing background... This may take a moment."
+      });
+      
+      // Create a new image element from the original image URL
+      const img = new Image();
+      img.src = originalImage;
+      
+      // Wait for image to load then process
+      await new Promise((resolve) => {
+        img.onload = resolve;
+      });
+      
+      // Use the ML-based background removal utility
+      const resultImageUrl = await removeBackground(img);
+      
+      // Update the displayed image
+      setDisplayedImage(resultImageUrl);
+      
+      toast({
+        title: "Background Removed",
+        description: "Background has been removed successfully."
+      });
+    } catch (error) {
+      console.error('Background removal error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove background. Please try again with a different image.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -183,6 +215,14 @@ const ImageProcessor = () => {
             <div className="flex-1 flex flex-col items-center justify-center">
               {displayedImage ? (
                 <div className="relative w-full aspect-square max-h-[500px] border rounded-lg overflow-hidden bg-gray-100">
+                  {isProcessing && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader className="h-8 w-8 animate-spin text-white" />
+                        <p className="text-white font-medium">Processing...</p>
+                      </div>
+                    </div>
+                  )}
                   <img
                     src={displayedImage}
                     alt="Processed"
@@ -215,7 +255,7 @@ const ImageProcessor = () => {
                     <Button 
                       onClick={() => applyFilter('bw')}
                       className="flex items-center gap-2"
-                      disabled={!originalImage}
+                      disabled={!originalImage || isProcessing}
                     >
                       <FileImage size={18} />
                       Convert to B/W
@@ -224,17 +264,17 @@ const ImageProcessor = () => {
                     <Button 
                       onClick={() => applyFilter('negative')}
                       className="flex items-center gap-2"
-                      disabled={!originalImage}
+                      disabled={!originalImage || isProcessing}
                     >
                       <Layers size={18} />
                       Apply Negative
                     </Button>
                     
                     <Button 
-                      onClick={removeBackground}
+                      onClick={handleRemoveBackground}
                       variant="outline"
                       className="flex items-center gap-2"
-                      disabled={!originalImage}
+                      disabled={!originalImage || isProcessing}
                     >
                       <Trash2 size={18} />
                       Remove Background
@@ -244,7 +284,7 @@ const ImageProcessor = () => {
                       onClick={() => applyFilter('reset')}
                       variant="outline"
                       className="flex items-center gap-2"
-                      disabled={!originalImage}
+                      disabled={!originalImage || isProcessing}
                     >
                       <RefreshCw size={18} />
                       Reset Image
@@ -258,7 +298,7 @@ const ImageProcessor = () => {
                       <Button 
                         variant="outline" 
                         className="w-full flex items-center gap-2"
-                        disabled={!originalImage}
+                        disabled={!originalImage || isProcessing}
                       >
                         <Sliders size={18} />
                         Adjust Filters
@@ -283,6 +323,7 @@ const ImageProcessor = () => {
                             max={10} 
                             step={0.1} 
                             onValueChange={(value) => updateFilter('blur', value[0])} 
+                            disabled={isProcessing}
                           />
                         </div>
                         
@@ -297,6 +338,7 @@ const ImageProcessor = () => {
                             max={50} 
                             step={1} 
                             onValueChange={(value) => updateFilter('brightness', value[0])} 
+                            disabled={isProcessing}
                           />
                         </div>
                         
@@ -311,6 +353,7 @@ const ImageProcessor = () => {
                             max={50} 
                             step={1} 
                             onValueChange={(value) => updateFilter('contrast', value[0])} 
+                            disabled={isProcessing}
                           />
                         </div>
                         
@@ -325,6 +368,7 @@ const ImageProcessor = () => {
                             max={100} 
                             step={1} 
                             onValueChange={(value) => updateFilter('saturation', value[0])} 
+                            disabled={isProcessing}
                           />
                         </div>
                         
@@ -339,6 +383,7 @@ const ImageProcessor = () => {
                             max={50} 
                             step={1} 
                             onValueChange={(value) => updateFilter('sharpness', value[0])} 
+                            disabled={isProcessing}
                           />
                         </div>
                       </div>
@@ -350,7 +395,7 @@ const ImageProcessor = () => {
                       <Button 
                         variant="outline"
                         className="w-full flex items-center gap-2"
-                        disabled={!originalImage}
+                        disabled={!originalImage || isProcessing}
                       >
                         <Zap size={18} />
                         Remove Noise
@@ -375,6 +420,7 @@ const ImageProcessor = () => {
                             max={50} 
                             step={1} 
                             onValueChange={(value) => updateFilter('noiseReduction', value[0])} 
+                            disabled={isProcessing}
                           />
                         </div>
                       </div>
@@ -401,6 +447,7 @@ const ImageProcessor = () => {
                     className="hidden" 
                     accept="image/jpeg,image/jpg,image/png" 
                     onChange={handleImageUpload} 
+                    disabled={isProcessing}
                   />
                 </label>
               </div>
