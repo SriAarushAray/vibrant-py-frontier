@@ -1,3 +1,4 @@
+
 import { useState, useRef, ChangeEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -212,6 +213,8 @@ const ImageProcessor = () => {
 
   const handleSaveCroppedImage = (croppedImageUrl: string) => {
     setDisplayedImage(croppedImageUrl);
+    // Also update original image to the cropped version so further edits use this as base
+    setOriginalImage(croppedImageUrl);
     toast({
       title: "Image Cropped",
       description: "Your image has been cropped successfully."

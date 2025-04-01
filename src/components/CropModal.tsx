@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Canvas, Object as FabricObject } from 'fabric';
+import { Canvas, Image as FabricImage, Rect, Object as FabricObject } from 'fabric';
 import { Crop, Save, X } from 'lucide-react';
 
 interface CropModalProps {
@@ -16,6 +16,7 @@ const CropModal = ({ isOpen, onClose, imageUrl, onSave }: CropModalProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [cropRect, setCropRect] = useState<FabricObject | null>(null);
+  const [originalImage, setOriginalImage] = useState<FabricImage | null>(null);
 
   // Initialize canvas when modal opens
   useEffect(() => {
@@ -23,10 +24,11 @@ const CropModal = ({ isOpen, onClose, imageUrl, onSave }: CropModalProps) => {
       const fabricCanvas = new Canvas(canvasRef.current, {
         width: 700,
         height: 500,
+        backgroundColor: '#f9fafb',
       });
 
       // Load image to canvas
-      fabric.Image.fromURL(imageUrl, (img) => {
+      FabricImage.fromURL(imageUrl, (img) => {
         // Scale image to fit canvas
         const canvasRatio = fabricCanvas.width! / fabricCanvas.height!;
         const imgRatio = img.width! / img.height!;
@@ -47,11 +49,11 @@ const CropModal = ({ isOpen, onClose, imageUrl, onSave }: CropModalProps) => {
           selectable: false,
         });
         
+        setOriginalImage(img);
         fabricCanvas.add(img);
-        fabricCanvas.renderAll();
         
         // Add crop rectangle - initially sized to 50% of image
-        const rect = new fabric.Rect({
+        const rect = new Rect({
           left: img.left! + img.width! * scaleFactor * 0.25,
           top: img.top! + img.height! * scaleFactor * 0.25,
           width: img.width! * scaleFactor * 0.5,
@@ -70,6 +72,7 @@ const CropModal = ({ isOpen, onClose, imageUrl, onSave }: CropModalProps) => {
         fabricCanvas.add(rect);
         fabricCanvas.setActiveObject(rect);
         setCropRect(rect);
+        fabricCanvas.renderAll();
         setCanvas(fabricCanvas);
       });
       
@@ -77,17 +80,13 @@ const CropModal = ({ isOpen, onClose, imageUrl, onSave }: CropModalProps) => {
         fabricCanvas.dispose();
         setCanvas(null);
         setCropRect(null);
+        setOriginalImage(null);
       };
     }
   }, [isOpen, imageUrl]);
 
   const handleCrop = () => {
-    if (!canvas || !cropRect) return;
-    
-    const rect = cropRect as fabric.Rect;
-    const imgInstance = canvas.getObjects().find(obj => obj.type === 'image') as fabric.Image;
-    
-    if (!imgInstance) return;
+    if (!canvas || !cropRect || !originalImage || !imageUrl) return;
     
     // Create temporary canvas for cropping
     const tempCanvas = document.createElement('canvas');
@@ -95,41 +94,55 @@ const CropModal = ({ isOpen, onClose, imageUrl, onSave }: CropModalProps) => {
     
     if (!tempCtx) return;
     
-    const scaleX = imgInstance.scaleX || 1;
-    const scaleY = imgInstance.scaleY || 1;
+    // Get crop rectangle dimensions and position
+    const rect = cropRect as Rect;
+    const rectLeft = rect.left || 0;
+    const rectTop = rect.top || 0;
+    const rectWidth = (rect.width || 0) * (rect.scaleX || 1);
+    const rectHeight = (rect.height || 0) * (rect.scaleY || 1);
     
-    // Calculate positions relative to the image
-    const left = Math.max(0, (rect.left! - imgInstance.left!) / scaleX);
-    const top = Math.max(0, (rect.top! - imgInstance.top!) / scaleY);
-    const width = Math.min(rect.width! * rect.scaleX! / scaleX, imgInstance.width! - left);
-    const height = Math.min(rect.height! * rect.scaleY! / scaleY, imgInstance.height! - top);
+    // Get original image position and scale
+    const imgLeft = originalImage.left || 0;
+    const imgTop = originalImage.top || 0;
+    const imgWidth = originalImage.width || 1;
+    const imgHeight = originalImage.height || 1;
+    const imgScaleX = originalImage.scaleX || 1;
+    const imgScaleY = originalImage.scaleY || 1;
+    
+    // Calculate crop coordinates relative to the image
+    const cropX = Math.max(0, (rectLeft - imgLeft) / imgScaleX);
+    const cropY = Math.max(0, (rectTop - imgTop) / imgScaleY);
+    const cropWidth = Math.min(rectWidth / imgScaleX, imgWidth - cropX);
+    const cropHeight = Math.min(rectHeight / imgScaleY, imgHeight - cropY);
     
     // Set temp canvas dimensions to the crop size
-    tempCanvas.width = width;
-    tempCanvas.height = height;
+    tempCanvas.width = cropWidth;
+    tempCanvas.height = cropHeight;
     
     // Create a new image element from the original image
     const img = new Image();
+    img.crossOrigin = "Anonymous";
+    
     img.onload = () => {
       // Draw the cropped portion to the temp canvas
       tempCtx.drawImage(
         img,
-        left / imgInstance.scaleX!,
-        top / imgInstance.scaleY!,
-        width / imgInstance.scaleX!,
-        height / imgInstance.scaleY!,
+        cropX,
+        cropY,
+        cropWidth,
+        cropHeight,
         0, 0,
-        width,
-        height
+        cropWidth,
+        cropHeight
       );
       
-      // Get the data URL from the temp canvas
+      // Get the data URL from the temp canvas and save
       const dataUrl = tempCanvas.toDataURL('image/png');
       onSave(dataUrl);
       onClose();
     };
     
-    img.src = imageUrl!;
+    img.src = imageUrl;
   };
 
   return (

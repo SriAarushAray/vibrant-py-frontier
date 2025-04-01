@@ -17,6 +17,13 @@ declare module 'fabric' {
     getObjects(): Object[];
     setActiveObject(object: Object): Canvas;
     dispose(): void;
+    freeDrawingBrush: {
+      color: string;
+      width: number;
+    };
+    isDrawingMode: boolean;
+    clear(): Canvas;
+    backgroundColor: string;
   }
 
   export class Object {
@@ -30,6 +37,15 @@ declare module 'fabric' {
     scaleX?: number;
     scaleY?: number;
     selectable?: boolean;
+    lockRotation?: boolean;
+    stroke?: string;
+    strokeWidth?: number;
+    strokeDashArray?: number[];
+    fill?: string;
+    transparentCorners?: boolean;
+    cornerColor?: string;
+    cornerStrokeColor?: string;
+    cornerSize?: number;
   }
 
   export class Rect extends Object {
@@ -39,6 +55,8 @@ declare module 'fabric' {
   export class Image extends Object {
     static fromURL(url: string, callback: (image: Image) => void, options?: any): void;
     scale(value: number): Image;
+    setSrc(url: string, callback: (image: Image) => void, options?: any): void;
+    crossOrigin?: string;
   }
 
   export const util: {
