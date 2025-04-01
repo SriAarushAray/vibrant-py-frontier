@@ -24,6 +24,8 @@ declare module 'fabric' {
     isDrawingMode: boolean;
     clear(): Canvas;
     backgroundColor: string;
+    on(event: string, callback: Function): Canvas;
+    requestRenderAll(): Canvas;
   }
 
   export class Object {
@@ -46,10 +48,18 @@ declare module 'fabric' {
     cornerColor?: string;
     cornerStrokeColor?: string;
     cornerSize?: number;
+    originX?: string;
+    originY?: string;
+    setCoords(): Object;
   }
 
   export class Rect extends Object {
     constructor(options?: any);
+  }
+
+  export class Circle extends Object {
+    constructor(options?: any);
+    radius?: number;
   }
 
   export class Image extends Object {
